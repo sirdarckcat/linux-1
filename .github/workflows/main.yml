@@ -15,7 +15,6 @@ jobs:
           fetch-depth: 0
 
       - run: cd $GITHUB_WORKSPACE
-      - run: cat .git/config
       - run: git remote rename origin github
       - run: git remote add upstream https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux
       - run: git remote add -t master torvalds https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux
@@ -23,15 +22,12 @@ jobs:
       - run: git config branch.master.merge refs/heads/master
       - run: git config remote.upstream.pushurl $(git config remote.github.url)
       - run: git config remote.torvalds.pushurl $(git config remote.github.url)
-      - run: cat .git/config
       - run: git pull --all
       - run: git push --all
+      - run: git log --all --format=format:'%H%x09%(trailers:key=Fixes,separator=%x09,valueonly=true)' > fixes.tsv
+      - run: git log --all --format=format:'%H%x09%(trailers:key=Reported-by,separator=%x09,valueonly=true)' | grep syzkaller > reported_by.tsv
+      - run: git name-rev --tags --all | sed s/\ /$'\t'/g > tags.tsv
+      - run: git log --all --all-match -E --grep='\b[0-9a-f]{40}\b' --grep=pstream | grep '[0-9a-f]\{40\}' | grep '^commit \|Upstream commit\|commit.*upstream' | sed 's/\(\s*\).*\([0-9a-f]\{40\}\).*/\1\2/' | head -n 1000000 | sed ':a;N;$!ba;s/\n \+/\t/g' > upstream.tsv
+      - run: wc -l *.tsv
+      - run: git push --all
 
-      - uses: actions/setup-node@v2
-        with:
-          node-version: '14'
-
-      - run: npm install git-parse
-      - run: |
-          node -e "require('git-parse').gitToJs('.').then(c=>console.log(JSON.stringify(c)));" > commits.json
-          head commits.json
