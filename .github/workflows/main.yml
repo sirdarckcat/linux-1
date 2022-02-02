@@ -29,5 +29,7 @@ jobs:
       - run: git name-rev --tags --all | sed s/\ /$'\t'/g > tags.tsv
       - run: git log --all --all-match -E --grep='\b[0-9a-f]{40}\b' --grep=pstream | grep '[0-9a-f]\{40\}' | grep '^commit \|Upstream commit\|commit.*upstream' | sed 's/\(\s*\).*\([0-9a-f]\{40\}\).*/\1\2/' | sed ':a;N;$!ba;s/\n \+/\t/g' > upstream.tsv
       - run: git add fixes.tsv reported_by.tsv tags.tsv upstream.tsv
+      - run: git config --local user.email "action@github.com"
+      - run: git config --local user.name "GitHub Action"
       - run: git commit -m '[automatic] update tsvs'
       - run: git push
