@@ -13,16 +13,18 @@ jobs:
       - run: pwd && ls
       - uses: actions/checkout@v2
         with:
-          repository: sirdarckcat/linux-1
-          # fetch-depth: 0
+          repository: sirdarckcat/linux-mirror
+          path: ./linux-mirror
 
       - run: pwd && ls
       - uses: actions/checkout@v2
         with:
-          repository: sirdarckcat/linux-mirror
+          repository: sirdarckcat/linux-1
+          # fetch-depth: 0
+          path: ./linux-1
 
       - run: pwd && ls
-      - run: cd ../linux-1
+      - run: cd ./linux-1
       - run: git remote rename origin github
       - run: git remote add upstream https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux
       - run: git remote add -t master torvalds https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux
@@ -37,7 +39,7 @@ jobs:
       - run: git name-rev --tags --all | sed s/\ /$'\t'/g > ../linux-mirror/tags.tsv
       - run: git log --all --all-match -E --grep='\b[0-9a-f]{40}\b' --grep=pstream | grep '[0-9a-f]\{40\}' | grep '^commit \|Upstream commit\|commit.*upstream' | sed 's/\(\s*\).*\([0-9a-f]\{40\}\).*/\1\2/' | sed ':a;N;$!ba;s/\n \+/\t/g' > ../linux-mirror/upstream.tsv
       - run: |
-          cd ../mirror
+          cd ../linux-mirror
           git add fixes.tsv reported_by.tsv tags.tsv upstream.tsv
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
