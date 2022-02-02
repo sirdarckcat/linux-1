@@ -5,7 +5,7 @@
 	logallrefupdates = true
 [remote "github"]
 	url = git@github.com:sirdarckcat/linux-1.git
-	fetch = +refs/heads/*:refs/remotes/upstream/*
+	fetch = +refs/heads/linux-mirror-config:refs/remotes/github/linux-mirror-config
 	pushurl = git@github.com:sirdarckcat/linux-1.git
 [remote "upstream"]
 	url = https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux
