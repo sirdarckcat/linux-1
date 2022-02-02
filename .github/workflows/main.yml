@@ -12,13 +12,16 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
+          repository: sirdarckcat/linux-1
           fetch-depth: 0
+          path: linux-1
 
       - uses: actions/checkout@v2
         with:
           repository: sirdarckcat/linux-mirror
+          path: linux-mirror
 
-      - run: cd linux-1
+      - run: cd ../linux-1
       - run: git remote rename origin github
       - run: git remote add upstream https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux
       - run: git remote add -t master torvalds https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux
