@@ -13,14 +13,14 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          path: linux
+          lfs: true
 
       - uses: actions/checkout@v2
         with:
           repository: sirdarckcat/linux-mirror
-          path: mirror
+          lfs: true
 
-      - run: cd $GITHUB_WORKSPACE/linux
+      - run: cd $GITHUB_WORKSPACE/linux-1
       - run: git remote rename origin github
       - run: git remote add upstream https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux
       - run: git remote add -t master torvalds https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux
@@ -30,7 +30,7 @@ jobs:
       - run: git config remote.torvalds.pushurl $(git config remote.github.url)
       - run: git pull --all
       - run: git push --all
-      - run: cd $GITHUB_WORKSPACE/linux
+      - run: cd $GITHUB_WORKSPACE/linux-mirror
       - run: git log --all --format=format:'%H%x09%(trailers:key=Fixes,separator=%x09,valueonly=true)' > ../mirror/fixes.tsv
       - run: git log --all --format=format:'%H%x09%(trailers:key=Reported-by,separator=%x09,valueonly=true)' | grep syzkaller > ../mirror/reported_by.tsv
       - run: git name-rev --tags --all | sed s/\ /$'\t'/g > ../mirror/tags.tsv
