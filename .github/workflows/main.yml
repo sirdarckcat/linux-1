@@ -12,12 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Sync mirror
-        run: |
-          cd $GITHUB_WORKSPACE
-          cp -f git-config ./.git/config
-          git pull --all
-          git push --all
+      - run: cd $GITHUB_WORKSPACE
+      - run: cp -f git-config ./.git/config
+      - run: git pull --all
+      - run: git push --all
 
       - uses: actions/setup-node@v2
         with:
@@ -25,6 +23,5 @@ jobs:
 
       - run: npm install git-parse
       - run: |
-          cd $GITHUB_WORKSPACE
           node -e "require('git-parse').gitToJs('.').then(c=>console.log(JSON.stringify(c)));" > commits.json
           head commits.json
