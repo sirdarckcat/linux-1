@@ -15,7 +15,15 @@ jobs:
           fetch-depth: 0
 
       - run: cd $GITHUB_WORKSPACE
-      - run: cp -f git-config ./.git/config
+      - run: cat .git/config
+      - run: git remote rename origin github
+      - run: git remote add upstream https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux
+      - run: git remote add -t master torvalds https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux
+      - run: git config branch.master.remote torvalds
+      - run: git config branch.master.merge refs/heads/master
+      - run: git config remote.upstream.pushurl $(git config remote.github.url)
+      - run: git config remote.torvalds.pushurl $(git config remote.github.url)
+      - run: cat .git/config
       - run: git pull --all
       - run: git push --all
 
