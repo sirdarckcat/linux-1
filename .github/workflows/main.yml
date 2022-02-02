@@ -12,9 +12,19 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Run a one-line script
+      - name: Sync mirror
         run: |
           cd $GITHUB_WORKSPACE
           cp -f git-config ./.git/config
           git pull --all
           git push --all
+
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - run: npm install git-parse
+      - run: |
+          cd $GITHUB_WORKSPACE
+          node -e "require('git-parse').gitToJs('.').then(c=>console.log(JSON.stringify(c)));" > commits.json
+          head commits.json
