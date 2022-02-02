@@ -10,39 +10,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - run: pwd && ls -a
       - uses: actions/checkout@v2
         with:
           repository: sirdarckcat/linux-mirror
           path: ./linux-mirror
 
-      - run: pwd && ls -a
       - uses: actions/checkout@v2
         with:
           repository: sirdarckcat/linux-1
-          # fetch-depth: 0
+          fetch-depth: 0
           path: ./linux-1
 
-      - run: pwd && ls -a
-      - run: cd ./linux-1 && ls -a
-      - run: git remote rename origin github
-#       - run: git remote add upstream https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux
-#       - run: git remote add -t master torvalds https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux
-#       - run: git config branch.master.remote torvalds
-#       - run: git config branch.master.merge refs/heads/master
-#       - run: git config remote.upstream.pushurl $(git config remote.github.url)
-#       - run: git config remote.torvalds.pushurl $(git config remote.github.url)
-#       - run: git pull --all
-#       - run: git push --all
-#       - run: git log --all --format=format:'%H%x09%(trailers:key=Fixes,separator=%x09,valueonly=true)' > ../linux-mirror/fixes.tsv
-#       - run: git log --all --format=format:'%H%x09%(trailers:key=Reported-by,separator=%x09,valueonly=true)' | grep syzkaller > ../linux-mirror/reported_by.tsv
-#       - run: git name-rev --tags --all | sed s/\ /$'\t'/g > ../linux-mirror/tags.tsv
-#       - run: git log --all --all-match -E --grep='\b[0-9a-f]{40}\b' --grep=pstream | grep '[0-9a-f]\{40\}' | grep '^commit \|Upstream commit\|commit.*upstream' | sed 's/\(\s*\).*\([0-9a-f]\{40\}\).*/\1\2/' | sed ':a;N;$!ba;s/\n \+/\t/g' > ../linux-mirror/upstream.tsv
-      - run: cd ../linux-mirror && ls -lah
-#       - run: |
-#           cd ../linux-mirror
-#           git add fixes.tsv reported_by.tsv tags.tsv upstream.tsv
-#           git config --local user.email "action@github.com"
-#           git config --local user.name "GitHub Action"
-#           git commit -m '[automatic] update tsvs'
-#           git push
+      - name: Update mirror
+        working-directory: ./linux-1
+        run: |
+          git remote rename origin github
+          git remote add upstream https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux
+          git remote add -t master torvalds https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux
+          git config branch.master.remote torvalds
+          git config branch.master.merge refs/heads/master
+          git config remote.upstream.pushurl $(git config remote.github.url)
+          git config remote.torvalds.pushurl $(git config remote.github.url)
+          git pull --all
+          git push --all
+
+      - name: Create TSVs
+        working-directory: ./linux-1
+        run: |
+          git log --all --format=format:'%H%x09%(trailers:key=Fixes,separator=%x09,valueonly=true)' > ../linux-mirror/fixes.tsv
+          git log --all --format=format:'%H%x09%(trailers:key=Reported-by,separator=%x09,valueonly=true)' | grep syzkaller > ../linux-mirror/reported_by.tsv
+          git name-rev --tags --all | sed s/\ /$'\t'/g > ../linux-mirror/tags.tsv
+          git log --all --all-match -E --grep='\b[0-9a-f]{40}\b' --grep=pstream | grep '[0-9a-f]\{40\}' | grep '^commit \|Upstream commit\|commit.*upstream' | sed 's/\(\s*\).*\([0-9a-f]\{40\}\).*/\1\2/' | sed ':a;N;$!ba;s/\n \+/\t/g' > ../linux-mirror/upstream.tsv
+
+      - name: Upload TSVs
+        working-directory: ./linux-mirror
+        run: |
+          git add fixes.tsv reported_by.tsv tags.tsv upstream.tsv
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git commit -m '[automatic] update tsvs'
+          git push
