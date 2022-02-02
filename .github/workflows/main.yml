@@ -15,6 +15,6 @@ jobs:
       - name: Run a one-line script
         run: |
           cd $GITHUB_WORKSPACE
-          cp -f git-config ./git/config
+          cp -f git-config ./.git/config
           git pull --all
           git push --all
