@@ -11,6 +11,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - run: cd $GITHUB_WORKSPACE
       - run: cp -f git-config ./.git/config
