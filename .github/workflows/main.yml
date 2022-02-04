@@ -12,17 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          repository: sirdarckcat/linux-mirror
-          path: ./linux-mirror
-
-      - uses: actions/checkout@v2
-        with:
           repository: sirdarckcat/linux-1
           fetch-depth: 0
-          path: ./linux-1
 
       - name: Update mirror
-        working-directory: ./linux-1
         run: |
           git remote rename origin github
           git remote add upstream https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux
