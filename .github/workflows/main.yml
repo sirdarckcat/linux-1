@@ -24,6 +24,6 @@ jobs:
           git config remote.upstream.pushurl $(git config remote.github.url)
           git config remote.torvalds.pushurl $(git config remote.github.url)
           git pull --all
-          git push github 'refs/remotes/upstream/*:refs/heads/*'
+          git push -f github 'refs/remotes/upstream/*:refs/heads/*'
           git push github 'refs/remotes/torvalds/master:refs/heads/master'
           git push github --tags
