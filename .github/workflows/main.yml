@@ -23,6 +23,7 @@ jobs:
           git config branch.master.merge refs/heads/master
           git config remote.upstream.pushurl $(git config remote.github.url)
           git config remote.torvalds.pushurl $(git config remote.github.url)
-          git pull upstream --all
-          git pull torvalds --all
-          git push github --all
+          git pull --all
+          git push github 'refs/remotes/upstream/*:refs/heads/*'
+          git push github 'refs/remotes/torvalds/master:refs/heads/master'
+          git push github --tags
