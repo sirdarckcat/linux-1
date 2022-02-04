@@ -1,7 +1,7 @@
 name: Sync
 
 on:
-  schedule:
+#   schedule:
 #     - cron: '57 * * * *'
   workflow_dispatch:
 
