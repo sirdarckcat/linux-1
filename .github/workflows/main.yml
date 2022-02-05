@@ -56,4 +56,6 @@ jobs:
           destination: '${{ env.BUCKET_NAME }}/'
           path: ./
           glob: '*.csv'
+          headers: |-
+            cache-control: no-cache
 
