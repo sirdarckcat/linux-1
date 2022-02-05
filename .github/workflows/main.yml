@@ -27,3 +27,30 @@ jobs:
           git push -f github 'refs/remotes/upstream/*:refs/heads/*'
           git push github 'refs/remotes/torvalds/master:refs/heads/master'
           git push github --tags
+
+      - name: Create raw TSVs
+        run: |
+          git log --all --format=format:'%H%x09%(trailers:key=Fixes,separator=%x09,valueonly=true)' > ./fixes_raw.tsv
+          git log --all --format=format:'%H%x09%(trailers:key=Reported-by,separator=%x09,valueonly=true)' | grep syzkaller > ./reported_by_raw.tsv
+          git name-rev --tags --all | sed s/\ /$'\t'/g > ./tags_raw.tsv
+          git log --all --all-match -E --grep='\b[0-9a-f]{40}\b' --grep=pstream | grep '[0-9a-f]\{40\}' | grep '^commit \|Upstream commit\|commit.*upstream' | sed 's/\(\s*\).*\([0-9a-f]\{40\}\).*/\1\2/' | sed ':a;N;$!ba;s/\n \+/\t/g' > ./upstream_raw.tsv
+
+      - name: Create valid CSVs
+        run: |
+          jq --raw-output --raw-input --slurp '["commit","fixes"],(.|split("\n")|.[]|split("\t")|.[0] as $commit|.[1:][]|[$commit,.])|@csv' ./fixes_raw.tsv > ./fixes.csv
+          jq --raw-output --raw-input --slurp '["commit","reported_by"],(.|split("\n")|.[]|split("\t")|.[0] as $commit|.[1:][]|select(contains("syzkaller"))|[$commit,.])|@csv' ./reported_by_raw.tsv > ./reported_by.csv
+          jq --raw-output --raw-input --slurp '["commit","tags"],(.|split("\n")|.[]|split("\t")|.[0] as $commit|.[1:][]|[$commit,.])|@csv' ./tags_raw.tsv > ./tags.csv
+          jq --raw-output --raw-input --slurp '["commit","upstream"],(.|split("\n")|.[]|split("\t")|.[0] as $commit|.[1:][]|[$commit,.])|@csv' ./upstream_raw.tsv > ./upstream.csv
+
+      - uses: 'google-github-actions/auth@v0'
+        with:
+          workload_identity_provider: 'projects/799795028847/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github@sdcpocs.iam.gserviceaccount.com'
+
+      - uses: 'google-github-actions/upload-cloud-storage@v0'
+        with:
+          destination: '${{ env.BUCKET_NAME }}'
+          parent: false
+          path: 'linux-repo'
+          glob: '*.csv'
+
