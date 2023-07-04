@@ -47,8 +47,8 @@ jobs:
         run: |
           mkdir syzkaller
           curl https://syzkaller.appspot.com/upstream/fixed?json=1 | jq -r '.Bugs[].link' | sed s#/bug?##g | xargs -n 100 | tr ' ' , | xargs -i curl --output-dir syzkaller -o 'bug_#1.json' -Z 'https://syzkaller.appspot.com/bug?{{}}&json=1'
-          echo commit > syzkaller.csv
-          cat syzkaller/bug_* | jq -r '.["fix-commits"][].hash | select( . != null )' >> syzkaller.csv
+          echo syzkaller,commit > syzkaller.csv
+          cat syzkaller/bug_* | jq -r '(.id as $id|.["fix-commits"][].hash | select( . != null )|[$id, .])|@csv' >> syzkaller.csv
 
       - name: Create valid CSVs
         run: |
