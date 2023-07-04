@@ -42,6 +42,14 @@ jobs:
           git name-rev --tags --all | sed s/\ /$'\t'/g > ./tags_raw.tsv
           git log --all --all-match -E --grep='\b[0-9a-f]{40}\b' --grep=pstream | grep '[0-9a-f]\{40\}' | grep -i '^commit \|Upstream commit\|commit.*upstream' | sed 's/\(\s*\).*\([0-9a-f]\{40\}\).*/\1\2/' | sed ':a;N;$!ba;s/\n \+/\t/g' > ./upstream_raw.tsv
 
+
+      - name: Dump Syzkaller commit IDs
+        run: |
+          mkdir syzkaller
+          curl https://syzkaller.appspot.com/upstream/fixed?json=1 | jq -r '.Bugs[].link+"&json=1"' | sed s#/bug?##g | xargs -n 100 | tr ' ' , | xargs -i curl --output-dir syzkaller -o 'bug_#1' -Z https://syzkaller.appspot.com/bug?{{}}
+          echo commit > syzkaller.csv
+          cat syzkaller/bug_* | jq -r '.["fix-commits"][].hash | select( . != null )' >> syzkaller.csv
+
       - name: Create valid CSVs
         run: |
           jq --raw-output --raw-input --slurp '["commit","fixes"],(.|split("\n")|.[]|split("\t")|.[0] as $commit|.[1:][]|[$commit,.])|@csv' ./fixes_raw.tsv > ./fixes.csv
