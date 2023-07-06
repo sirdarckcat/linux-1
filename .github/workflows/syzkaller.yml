@@ -15,7 +15,7 @@ jobs:
           cat reported_by.csv | jq -r --raw-input '. | scan("syzbot\\+([0-9a-f]{0,21})@") | "extid=" + .[]' | uniq > syzkaller_extid.txt
           cat reported_by.csv | jq -r --raw-input '. | scan("bot\\+([0-9a-f]{21,})@") | "id=" + .[]' | uniq > syzkaller_id.txt
           curl https://syzkaller.appspot.com/upstream/fixed?json=1 | jq -r '.Bugs[].link' | sed s#/bug?##g > syzkaller_fixed.txt
-          uniq syzkaller_{fixed,extid,id}.txt | xargs -n 200 | tr ' ' , | xargs -i curl --output-dir syzkaller -o 'bug_#1.json' -Z 'https://syzkaller.appspot.com/bug?{{}}&json=1'
+          cat syzkaller_{fixed,extid,id}.txt | uniq | xargs -n 200 | tr ' ' , | xargs -i curl --output-dir syzkaller -o 'bug_#1.json' -Z 'https://syzkaller.appspot.com/bug?{{}}&json=1'
           echo FINISHED FETCHING
           echo syzkaller,commit > syzkaller.csv
           cat $(grep -l KASAN syzkaller/bug_*) | jq -r '(.id as $id | .["fix-commits"][].hash | select( . != null ) | [$id, .]) | @csv' >> syzkaller.csv
