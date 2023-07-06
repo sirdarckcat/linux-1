@@ -49,17 +49,6 @@ jobs:
           jq --raw-output --raw-input --slurp '["commit","tags"],(.|split("\n")|.[]|split("\t")|.[0] as $commit|.[1:][]|[$commit,.])|@csv' ./tags_raw.tsv > ./tags.csv
           jq --raw-output --raw-input --slurp '["commit","upstream"],(.|split("\n")|.[]|split("\t")|.[0] as $commit|.[1:][]|[$commit,.])|@csv' ./upstream_raw.tsv > ./upstream.csv
 
-      - name: Dump Syzkaller commit IDs
-        run: |
-          mkdir syzkaller
-          cat reported_by.csv | jq -r --raw-input '. | scan("syzbot\\+([0-9a-f]{0,21})@") | "extid=" + .[]' | uniq > syzkaller_extid.txt
-          cat reported_by.csv | jq -r --raw-input '. | scan("bot\\+([0-9a-f]{21,})@") | "id=" + .[]' | uniq > syzkaller_id.txt
-          curl https://syzkaller.appspot.com/upstream/fixed?json=1 | jq -r '.Bugs[].link' | sed s#/bug?##g > syzkaller_fixed.txt
-          uniq syzkaller_{fixed,extid,id}.txt | xargs -n 100 | tr ' ' , | xargs -i curl --fail --output-dir syzkaller -o 'bug_#1.json' -Z 'https://syzkaller.appspot.com/bug?{{}}&json=1'
-          echo FINISHED FETCHING
-          echo syzkaller,commit > syzkaller.csv
-          cat $(grep -l KASAN syzkaller/bug_*) | jq -r '(.id as $id | .["fix-commits"][].hash | select( . != null ) | [$id, .]) | @csv' >> syzkaller.csv
-
       - uses: 'google-github-actions/auth@v0'
         with:
           workload_identity_provider: 'projects/799795028847/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
