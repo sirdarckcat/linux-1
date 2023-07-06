@@ -39,6 +39,8 @@ jobs:
         run: |
           git log --all --format=format:'%H%x09%(trailers:key=Fixes,separator=%x09,valueonly=true)' > ./fixes_raw.tsv
           git log --all --format=format:'%H%x09%(trailers:key=Reported-by,separator=%x09,valueonly=true)' | grep syzkaller > ./reported_by_raw.tsv
+          git log --all --format=format:'%H%x09%(trailers:key=Reported-and-tested-by,separator=%x09,valueonly=true)' | grep syzkaller >> ./reported_by_raw.tsv
+          git log --all --format=format:'%H%x09%(trailers:key=Tested-by,separator=%x09,valueonly=true)' | grep syzkaller >> ./reported_by_raw.tsv
           git name-rev --tags --all | sed s/\ /$'\t'/g > ./tags_raw.tsv
           git log --all --all-match -E --grep='\b[0-9a-f]{40}\b' --grep=pstream | grep '[0-9a-f]\{40\}' | grep -i '^commit \|Upstream commit\|commit.*upstream' | sed 's/\(\s*\).*\([0-9a-f]\{40\}\).*/\1\2/' | sed ':a;N;$!ba;s/\n \+/\t/g' > ./upstream_raw.tsv
 
