@@ -20,16 +20,12 @@ jobs:
       - name: Dump Syzkaller commit IDs
         run: |
           wget https://linux-mirror-db.storage.googleapis.com/reported_by.csv
-          mkdir syzkaller
-          cat reported_by.csv | jq -r --raw-input '. | scan("syzbot\\+([0-9a-f]+)@") | "extid=" + .[]' | uniq > syzkaller_extid.txt
-          curl https://syzkaller.appspot.com/upstream/fixed?json=1 | jq -r '.Bugs[].link' | sed s#/bug?##g > syzkaller_fixed.txt
-          cat syzkaller_{fixed,extid}.txt | uniq | xargs -n 200 | tr ' ' , | xargs -i curl --output-dir syzkaller -o 'bug_#1.json' -Z 'https://syzkaller.appspot.com/bug?{{}}&json=1'
-          echo FINISHED FETCHING
-          echo syzkaller,commit > syzkaller.csv
-          ls syzkaller/* | xargs -i jq -r '((.id as $id | .["fix-commits"][]?.hash | select( . != null ) | [$id, .]) | @csv)' {} >> syzkaller.csv || true
+          cat reported_by.csv | jq -r --raw-input 'split("\n")|map("["+.+"]"|fromjson)[]|[.[0],(.[1] | scan("syzbot\\+([0-9a-f]+)@") | "extid=" + .[])] | @csv' | uniq > syzkaller_extid.txt
+          curl https://syzkaller.appspot.com/upstream/fixed?json=1 | jq -r '.Bugs[] | (.link as $link | .["fix-commits"][]?.hash | select( . != null ) | [., $link[5:]]) | @csv' > syzkaller_fixed.txt
+          echo commit,syzkaller > syzkaller.csv
+          cat syzkaller_*.txt | sort | uniq | grep , | grep -v : >> syzkaller.csv
           wc -l syzkaller.csv
           head syzkaller.csv
-          tar -zcvf syzkaller.tar.gz syzkaller
 
       - uses: 'google-github-actions/auth@v0'
         with:
