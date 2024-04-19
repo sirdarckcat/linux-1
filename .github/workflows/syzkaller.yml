@@ -28,7 +28,7 @@ jobs:
           cat syzkaller_{fixed,extid}.txt | uniq | xargs -n 200 | tr ' ' , | xargs -i curl -s --output-dir syzkaller -o 'bug_#1.json' -Z 'https://syzkaller.appspot.com/bug?{{}}&json=1&'$syzkaller_api
           echo FINISHED FETCHING
           echo syzkaller,commit > syzkaller.csv
-          ls syzkaller/* | xargs -i jq -r '((.id as $id | .["fix-commits"][]?.hash | select( . != null ) | [$id, .]) | @csv)' {} >> syzkaller.csv || true
+          ls syzkaller/* | xargs -i jq -r '((.id as $id | .["fix-commits"][]?.hash | select( . != null ) | ["id=" + $id, .]) | @csv)' {} >> syzkaller.csv || true
           wc -l syzkaller.csv
           head syzkaller.csv
           tar -zcvf syzkaller.tar.gz syzkaller
