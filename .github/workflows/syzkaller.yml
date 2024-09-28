@@ -29,8 +29,10 @@ jobs:
           tar xzf syzkaller.tar.gz
           cat reported_by.csv | jq -r --raw-input '. | scan("syzbot\\+([0-9a-f]+)@") | "extid=" + .[]' | uniq > syzkaller_extid.txt
           curl https://syzkaller.appspot.com/upstream/fixed?json=1 | jq -r '.Bugs[].link' | sed s#/bug?##g > syzkaller_fixed.txt
+          (cd syzkaller;ls *.json) | sed s/bug_//g | sed s/.json//g > syzkaller_old.txt
+          grep -v -x -f syzkaller_old.txt syzkaller_{fixed,extid}.txt > syzkaller_new.txt
           wc -l *.txt
-          cat syzkaller_{fixed,extid}.txt | uniq | xargs -n 15 | tr ' ' , | xargs -i ./curl --verbose --skip-existing --rate 15/16s --output-dir syzkaller -o 'bug_#1.json' 'https://syzkaller.appspot.com/bug?{{}}&json=1&'$syzkaller_api
+          cat syzkaller_new.txt | uniq | xargs -n 15 | tr ' ' , | xargs -i ./curl --no-progress-meter --rate 15/16s --output-dir syzkaller -o 'bug_#1.json' 'https://syzkaller.appspot.com/bug?{{}}&json=1&'$syzkaller_api
           echo FINISHED FETCHING
           ls syzkaller/*.json | head -n 1 | xargs cat
           echo syzkaller,commit > syzkaller.csv
