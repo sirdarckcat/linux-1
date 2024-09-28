@@ -32,7 +32,8 @@ jobs:
           curl https://syzkaller.appspot.com/upstream/fixed?json=1 | jq -r '.Bugs[].link' | sed s#/bug?##g > syzkaller_fixed.txt
           cat syzkaller_{fixed,extid}.txt > syzkaller_mix.txt
           ls syzkaller | xargs -n 1 basename | sed s/bug_//g | sed s/.json//g > syzkaller_old.txt
-          grep -vxf syzkaller_old.txt syzkaller_mix.txt > syzkaller_new.txt
+          head syzkaller_{mix,old}.txt
+          grep -vxf syzkaller_old.txt syzkaller_mix.txt || true > syzkaller_new.txt
           wc -l *.txt
           cat syzkaller_new.txt | uniq | xargs -n 15 | tr ' ' , | xargs -i ./curl --no-progress-meter --rate 15/16s --output-dir syzkaller -o 'bug_#1.json' 'https://syzkaller.appspot.com/bug?{{}}&json=1&'$syzkaller_api
           echo FINISHED FETCHING
