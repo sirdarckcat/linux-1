@@ -18,31 +18,9 @@ jobs:
 
     steps:
       - name: Dump Syzkaller commit IDs
-        env:
-          syzkaller_api: ${{ secrets.SYZKALLER_API}}
         run: |
-          set -x
-          wget https://github.com/stunnel/static-curl/releases/download/8.10.1/curl-linux-x86_64-8.10.1.tar.xz
-          tar xf curl-linux-x86_64-8.10.1.tar.xz
-          ls -lR .
-          wget https://linux-mirror-db.storage.googleapis.com/reported_by.csv
-          wget https://linux-mirror-db.storage.googleapis.com/syzkaller.tar.gz
-          tar xzf syzkaller.tar.gz
-          grep -l -r "429 Too" syzkaller | xargs rm
-          cat reported_by.csv | jq -r --raw-input '. | scan("syzbot\\+([0-9a-f]+)@") | "extid=" + .[]' | uniq > syzkaller_extid.txt
-          curl https://syzkaller.appspot.com/upstream/fixed?json=1 | jq -r '.Bugs[].link' | sed s#/bug?##g > syzkaller_fixed.txt
-          cat syzkaller_{fixed,extid}.txt | sort | uniq > syzkaller_mix.txt
-          ls syzkaller | xargs -n 1 basename | sed s/bug_//g | sed s/.json//g | sort | uniq > syzkaller_old.txt
-          head syzkaller_{mix,old}.txt
-          (grep -vxf syzkaller_old.txt syzkaller_mix.txt || true) > syzkaller_new.txt
-          wc -l *.txt
-          cat syzkaller_new.txt | xargs -n 15 | tr ' ' , | xargs -i ./curl --no-progress-meter --rate 15/16s --output-dir syzkaller -o 'bug_#1.json' 'https://syzkaller.appspot.com/bug?{{}}&json=1&'$syzkaller_api
-          echo FINISHED FETCHING
-          echo syzkaller,commit > syzkaller.csv
-          ls syzkaller | xargs -i jq -r '((.id as $id | .["fix-commits"][]?.hash | select( . != null ) | ["id=" + $id, .]) | @csv)' {} >> syzkaller.csv || true
-          wc -l syzkaller.csv
+          curl https://syzkaller.appspot.com/upstream/fixed?json=1 | jq -r '.Bugs[] | (.link as $link | [$link, .["fix-commits"][]?.hash]) | @csv' | sed s#/bug.##g > syzkaller.csv
           head syzkaller.csv
-          tar -zcvf syzkaller.tar.gz syzkaller
 
       - uses: 'google-github-actions/auth@v0'
         with:
