@@ -21,6 +21,7 @@ jobs:
         env:
           syzkaller_api: ${{ secrets.SYZKALLER_API}}
         run: |
+          set -x
           wget https://github.com/stunnel/static-curl/releases/download/8.10.1/curl-linux-x86_64-8.10.1.tar.xz
           tar xf curl-linux-x86_64-8.10.1.tar.xz
           ls -lR .
