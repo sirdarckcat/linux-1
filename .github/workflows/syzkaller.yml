@@ -21,11 +21,14 @@ jobs:
         env:
           syzkaller_api: ${{ secrets.SYZKALLER_API}}
         run: |
+          wget https://github.com/stunnel/static-curl/releases/download/8.10.1/curl-linux-x86_64-8.10.1.tar.xz
+          tar xf curl-linux-x86_64-8.10.1.tar.xz
+          ls -lR .
           wget https://linux-mirror-db.storage.googleapis.com/reported_by.csv
           mkdir syzkaller
           cat reported_by.csv | jq -r --raw-input '. | scan("syzbot\\+([0-9a-f]+)@") | "extid=" + .[]' | uniq > syzkaller_extid.txt
           curl https://syzkaller.appspot.com/upstream/fixed?json=1 | jq -r '.Bugs[].link' | sed s#/bug?##g > syzkaller_fixed.txt
-          cat syzkaller_{fixed,extid}.txt | uniq | xargs -n 200 | tr ' ' , | xargs -i curl --rate 2/s -s --output-dir syzkaller -o 'bug_#1.json' -Z 'https://syzkaller.appspot.com/bug?{{}}&json=1&'$syzkaller_api
+          cat syzkaller_{fixed,extid}.txt | uniq | xargs -n 200 | tr ' ' , | xargs -i ./curl --rate 2/s -s --output-dir syzkaller -o 'bug_#1.json' -Z 'https://syzkaller.appspot.com/bug?{{}}&json=1&'$syzkaller_api
           echo FINISHED FETCHING
           echo syzkaller,commit > syzkaller.csv
           ls syzkaller/* | xargs -i jq -r '((.id as $id | .["fix-commits"][]?.hash | select( . != null ) | ["id=" + $id, .]) | @csv)' {} >> syzkaller.csv || true
