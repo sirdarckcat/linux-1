@@ -19,7 +19,8 @@ jobs:
     steps:
       - name: Dump Syzkaller commit IDs
         run: |
-          curl https://syzkaller.appspot.com/upstream/fixed?json=1 | jq -r '.Bugs[] | (.link as $link | [$link, .["fix-commits"][]?.hash]) | @csv' | sed s#/bug.##g > syzkaller.csv
+          echo syzkaller,commit > syzkaller.csv
+          curl https://syzkaller.appspot.com/upstream/fixed?json=1 | jq -r '.Bugs[] | (.link as $link | [$link, .["fix-commits"][]?.hash]) | @csv' | sed s#/bug.##g >> syzkaller.csv
           head syzkaller.csv
 
       - uses: 'google-github-actions/auth@v0'
