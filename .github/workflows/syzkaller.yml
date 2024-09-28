@@ -28,7 +28,7 @@ jobs:
           mkdir syzkaller
           cat reported_by.csv | jq -r --raw-input '. | scan("syzbot\\+([0-9a-f]+)@") | "extid=" + .[]' | uniq > syzkaller_extid.txt
           curl https://syzkaller.appspot.com/upstream/fixed?json=1 | jq -r '.Bugs[].link' | sed s#/bug?##g > syzkaller_fixed.txt
-          cat syzkaller_{fixed,extid}.txt | uniq | xargs -n 200 | tr ' ' , | xargs -i ./curl --rate 15/16s -s --output-dir syzkaller -o 'bug_#1.json' 'https://syzkaller.appspot.com/bug?{{}}&json=1&'$syzkaller_api
+          cat syzkaller_{fixed,extid}.txt | uniq | xargs -n 200 | tr ' ' , | xargs -i ./curl --rate 15/16s -s --output-dir syzkaller -o 'bug_#1.json' -w '%{filename_effective}=%{response_code} ' 'https://syzkaller.appspot.com/bug?{{}}&json=1&'$syzkaller_api
           echo FINISHED FETCHING
           ls syzkaller/*.json | head -n 1 | xargs cat
           echo syzkaller,commit > syzkaller.csv
