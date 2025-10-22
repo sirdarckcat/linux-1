@@ -100,11 +100,11 @@ jobs:
         with:
           languages: c-cpp
           build-mode: autobuild
-          db-location: ${{ github.runner_temp }}/codeql_databases
+          db-location: ${{ github.runner_temp }}/${{ matrix.tag }}
 
       - name: Compress DB
         run: |
-          zip -r codeql_db_${{ matrix.tag }}.zip ${{ github.runner_temp }}/codeql_databases
+          zip -r codeql_db_${{ matrix.tag }}.zip ${{ github.runner_temp }}/${{ matrix.tag }}
 
       - name: Create Release
         id: create_release
