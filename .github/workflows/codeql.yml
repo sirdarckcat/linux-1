@@ -102,6 +102,11 @@ jobs:
           build-mode: autobuild
           db-location: /tmp/codeql_db_${{ matrix.tag }}
 
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          skip-queries: true
+
       - name: Compress DB
         run: |
           zip -r codeql_db_${{ matrix.tag }}.zip /tmp/codeql_db_${{ matrix.tag }}
