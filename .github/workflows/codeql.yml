@@ -4,13 +4,13 @@ on:
   # schedule:
   #   # Runs every 15 minutes. You can adjust this.
   #   - cron: '*/15 * * * *'
-  workflow_dispatch: # Allows you to run it manually as well
+  workflow_dispatch:
 
 jobs:
   check-for-new-tags:
     runs-on: ubuntu-latest
     permissions:
-      contents: read  # To checkout and read tags
+      contents: read
     
     outputs:
       new_tags: ${{ steps.find_new_tags.outputs.tags }}
@@ -20,8 +20,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-tags: true
           filter: blob:none
+          fetch-tags: true
 
       - name: Find new tags
         id: find_new_tags
