@@ -22,7 +22,6 @@ jobs:
         with:
           depth: 0
           filter: blob:none
-          fetch-tags: true
 
       - name: Find new tags
         id: find_new_tags
