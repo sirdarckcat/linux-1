@@ -62,7 +62,7 @@ jobs:
             echo "No new tags found."
             echo "has_tags=false" >> $GITHUB_OUTPUT
           else
-            JSON_TAGS=$(printf '%s\n' "${NEW_TAGS[@]}" | jq -R . | jq -s .)
+            JSON_TAGS=$(printf '%s\n' "${NEW_TAGS[@]}" | jq -R . | jq -s -c .)
             echo "Found new tags: $JSON_TAGS"
             echo "tags=$JSON_TAGS" >> $GITHUB_OUTPUT
             echo "has_tags=true" >> $GITHUB_OUTPUT
