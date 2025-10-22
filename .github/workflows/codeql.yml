@@ -28,38 +28,41 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get the creation date of the latest release. If no release exists, this will be empty.
-          LATEST_RELEASE_DATE=$(gh release list --limit 1 --json createdAt --jq '.[0].createdAt' || echo "")
-          
-          # If no releases exist, set the start date to one week ago. Otherwise, use the latest release date.
-          if [ -z "$LATEST_RELEASE_DATE" ]; then
-            LATEST_RELEASE_DATE=$(date -d "1 week ago" -u --iso-8601=seconds)
-            echo "No releases found. Processing tags created since $LATEST_RELEASE_DATE (one week ago)."
+          # Get latest release date (ISO8601 or empty)
+          LATEST_RELEASE_ISO_DATE=$(gh release list --limit 1 --json createdAt --jq '.[0].createdAt' || echo "")
+
+          # Convert to unix timestamp, or default to one week ago
+          if [ -z "$LATEST_RELEASE_ISO_DATE" ]; then
+            LATEST_RELEASE_TS=$(date -d "1 week ago" +%s)
+            echo "No releases found. Processing tags created since $(date -d @$LATEST_RELEASE_TS -u)."
           else
-            echo "Latest release was created on: $LATEST_RELEASE_DATE"
+            LATEST_RELEASE_TS=$(date -d "$LATEST_RELEASE_ISO_DATE" +%s)
+            echo "Latest release was created on $(date -d @$LATEST_RELEASE_TS -u)."
           fi
-          
-          # Get all tags with their creator date (ISO 8601 format)
-          # Format is "tag-name YYYY-MM-DDTHH:MM:SS+ZZZZ"
-          TAGS_WITH_DATES=$(git for-each-ref refs/tags --sort='-creatordate' --format='%(refname:short) %(creatordate:iso8601)')
-          
+
+          # Get tags and their unix timestamps (may include timezone, or be missing if lightweight)
+          TAGS_WITH_TIMESTAMPS=$(git for-each-ref refs/tags --sort='-creatordate' --format='%(refname:short) %(creatordate:raw)')
+
           NEW_TAGS=()
-          while read -r tag date; do
-            # Compare the tag's creation date with the latest release date (or one week ago)
-            if [[ "$(date -d "$date" +%s)" -gt "$(date -d "$LATEST_RELEASE_DATE" +%s)" ]]; then
-              echo "Found new tag: $tag created at $date"
+          while read -r tag timestamp tz; do
+            # Skip lines with missing tag or timestamp
+            if [[ -z "$tag" || -z "$timestamp" || ! "$timestamp" =~ ^[0-9]+$ ]]; then
+              continue
+            fi
+            # Compare timestamps
+            if [[ "$timestamp" -gt "$LATEST_RELEASE_TS" ]]; then
+              echo "Found new tag: $tag (created at $(date -d @$timestamp -u))"
               NEW_TAGS+=("$tag")
             else
-              # Since tags are sorted by date, we can stop once we find an old one
+              # Since tags are sorted by date, stop after old tag
               break
             fi
-          done <<< "$TAGS_WITH_DATES"
-          
+          done <<< "$TAGS_WITH_TIMESTAMPS"
+
           if [ ${#NEW_TAGS[@]} -eq 0 ]; then
             echo "No new tags found."
             echo "has_tags=false" >> $GITHUB_OUTPUT
           else
-            # Convert the bash array to a JSON array for the matrix strategy
             JSON_TAGS=$(printf '%s\n' "${NEW_TAGS[@]}" | jq -R . | jq -s .)
             echo "Found new tags: $JSON_TAGS"
             echo "tags=$JSON_TAGS" >> $GITHUB_OUTPUT
