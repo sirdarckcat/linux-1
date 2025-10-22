@@ -1,0 +1,67 @@
+name: "CodeQL Advanced"
+
+on:
+  workflow_dispatch:
+  push:
+    tags:        
+      - '*'
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: 'ubuntu-latest'
+    permissions:
+      security-events: write
+      contents: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - language: c-cpp
+          build-mode: autobuild
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install the kernel source
+      run: |
+        make mrproper
+        sudo apt-get update
+        sudo apt-get install -y libelf-dev
+        make defconfig
+
+    # Initializes the CodeQL tools for scanning.
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v4
+      with:
+        languages: ${{ matrix.language }}
+        build-mode: ${{ matrix.build-mode }}
+        db-location: ${{ github.runner_temp }}/codeql_databases
+
+    - name: Compress DB
+      run: |
+        zip -r codeql_db.zip ${{ github.runner_temp }}/codeql_databases
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: codeql_db.zip
+        asset_name: codeql_db.zip
+        asset_content_type: application/zip
