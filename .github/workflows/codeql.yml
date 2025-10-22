@@ -1,68 +1,126 @@
-name: "CodeQL"
+name: "Scheduled CodeQL Release Creator"
 
 on:
-  create
+  # schedule:
+  #   # Runs every 15 minutes. You can adjust this.
+  #   - cron: '*/15 * * * *'
+  workflow_dispatch: # Allows you to run it manually as well
 
 jobs:
-  create_db:
-    if: github.event.ref_type == 'tag'
-    name: Release
-    runs-on: 'ubuntu-latest'
+  check-for-new-tags:
+    runs-on: ubuntu-latest
     permissions:
-      contents: write
-      security-events: write
+      contents: read  # To checkout and read tags
+    
+    outputs:
+      new_tags: ${{ steps.find_new_tags.outputs.tags }}
+      has_new_tags: ${{ steps.find_new_tags.outputs.has_tags }}
 
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch all history and tags to get correct dates
+          fetch-depth: 0
+
+      - name: Find new tags
+        id: find_new_tags
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the creation date of the latest release. If no release exists, this will be empty.
+          LATEST_RELEASE_DATE=$(gh release list --limit 1 --json createdAt --jq '.[0].createdAt' || echo "")
+          
+          # If no releases exist, set the start date to one week ago. Otherwise, use the latest release date.
+          if [ -z "$LATEST_RELEASE_DATE" ]; then
+            LATEST_RELEASE_DATE=$(date -d "1 week ago" -u --iso-8601=seconds)
+            echo "No releases found. Processing tags created since $LATEST_RELEASE_DATE (one week ago)."
+          else
+            echo "Latest release was created on: $LATEST_RELEASE_DATE"
+          fi
+          
+          # Get all tags with their creator date (ISO 8601 format)
+          # Format is "tag-name YYYY-MM-DDTHH:MM:SS+ZZZZ"
+          TAGS_WITH_DATES=$(git for-each-ref refs/tags --sort='-creatordate' --format='%(refname:short) %(creatordate:iso8601)')
+          
+          NEW_TAGS=()
+          while read -r tag date; do
+            # Compare the tag's creation date with the latest release date (or one week ago)
+            if [[ "$(date -d "$date" +%s)" -gt "$(date -d "$LATEST_RELEASE_DATE" +%s)" ]]; then
+              echo "Found new tag: $tag created at $date"
+              NEW_TAGS+=("$tag")
+            else
+              # Since tags are sorted by date, we can stop once we find an old one
+              break
+            fi
+          done <<< "$TAGS_WITH_DATES"
+          
+          if [ ${#NEW_TAGS[@]} -eq 0 ]; then
+            echo "No new tags found."
+            echo "has_tags=false" >> $GITHUB_OUTPUT
+          else
+            # Convert the bash array to a JSON array for the matrix strategy
+            JSON_TAGS=$(printf '%s\n' "${NEW_TAGS[@]}" | jq -R . | jq -s .)
+            echo "Found new tags: $JSON_TAGS"
+            echo "tags=$JSON_TAGS" >> $GITHUB_OUTPUT
+            echo "has_tags=true" >> $GITHUB_OUTPUT
+          fi
+
+  create-release:
+    needs: check-for-new-tags
+    if: needs.check-for-new-tags.outputs.has_new_tags == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # To create releases and upload assets
+      security-events: write # For CodeQL
+    
     strategy:
       fail-fast: false
       matrix:
-        include:
-        - language: c-cpp
-          build-mode: autobuild
+        # Create a job for each new tag found in the previous job
+        tag: ${{ fromJson(needs.check-for-new-tags.outputs.new_tags) }}
 
     steps:
-    - name: Checkout repository at tag
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.ref }}
+      - name: Checkout repository at tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.tag }}
 
-    - name: Install the kernel source
-      run: |
-        make mrproper
-        sudo apt-get update
-        sudo apt-get install -y libelf-dev
-        make defconfig
+      - name: Install the kernel source
+        run: |
+          make mrproper
+          sudo apt-get update
+          sudo apt-get install -y libelf-dev
+          make defconfig
 
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v4
-      with:
-        languages: ${{ matrix.language }}
-        build-mode: ${{ matrix.build-mode }}
-        db-location: ${{ github.runner_temp }}/codeql_databases
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: c-cpp
+          build-mode: autobuild
+          db-location: ${{ github.runner_temp }}/codeql_databases
 
-    - name: Compress DB
-      run: |
-        zip -r codeql_db.zip ${{ github.runner_temp }}/codeql_databases
+      - name: Compress DB
+        run: |
+          zip -r codeql_db_${{ matrix.tag }}.zip ${{ github.runner_temp }}/codeql_databases
 
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: CodeQL DB for ${{ github.ref }}
-        body: |
-          Attached is the CodeQL database generated for this tag.
-        draft: false
-        prerelease: false
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ matrix.tag }}
+          release_name: CodeQL DB for ${{ matrix.tag }}
+          body: |
+            Attached is the CodeQL database generated for tag ${{ matrix.tag }}.
 
-    - name: Upload Release Asset
-      id: upload-release-asset 
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./codeql_db.zip
-        asset_name: codeql_db.zip
-        asset_content_type: application/zip
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./codeql_db_${{ matrix.tag }}.zip
+          asset_name: codeql_db_${{ matrix.tag }}.zip
+          asset_content_type: application/zip
