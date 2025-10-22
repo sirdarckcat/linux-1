@@ -41,22 +41,21 @@ jobs:
             echo "Latest release was created on $(date -d @$LATEST_RELEASE_TS -u)."
           fi
 
-          NEW_TAGS=()
-          git for-each-ref refs/tags --sort='-creatordate' --format='%(refname:short) %(creatordate:raw)' | (while read -r tag timestamp tz; do
+          NEW_TAGS=($(git for-each-ref refs/tags --sort='-creatordate' --format='%(refname:short) %(creatordate:raw)' | (NEW_TAGS=();while read -r tag timestamp tz; do
             # Skip lines with missing tag or timestamp
             if [[ -z "$tag" || -z "$timestamp" || ! "$timestamp" =~ ^[0-9]+$ ]]; then
-              echo "skipping $tag"
+              echo "skipping $tag" >&2
               continue
             fi
             # Compare timestamps
             if [[ "$timestamp" -gt "$LATEST_RELEASE_TS" ]]; then
-              echo "Found new tag: $tag (created at $(date -d @$timestamp -u))"
+              echo "Found new tag: $tag (created at $(date -d @$timestamp -u))" >&2
               NEW_TAGS+=("$tag")
             else
               # Since tags are sorted by date, stop after old tag
               break
             fi
-          done)
+          done; echo ${NEW_TAGS[@]})))
 
           if [ ${#NEW_TAGS[@]} -eq 0 ]; then
             echo "No new tags found."
