@@ -1,18 +1,16 @@
-name: "CodeQL Advanced"
+name: "CodeQL"
 
 on:
-  workflow_dispatch:
-  push:
-    tags:        
-      - '*'
+  create
 
 jobs:
-  analyze:
-    name: Analyze (${{ matrix.language }})
+  create_db:
+    if: github.event.ref_type == 'tag'
+    name: Release
     runs-on: 'ubuntu-latest'
     permissions:
-      security-events: write
       contents: write
+      security-events: write
 
     strategy:
       fail-fast: false
@@ -22,8 +20,10 @@ jobs:
           build-mode: autobuild
 
     steps:
-    - name: Checkout repository
+    - name: Checkout repository at tag
       uses: actions/checkout@v4
+      with:
+        ref: ${{ github.ref }}
 
     - name: Install the kernel source
       run: |
@@ -32,7 +32,6 @@ jobs:
         sudo apt-get install -y libelf-dev
         make defconfig
 
-    # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v4
       with:
@@ -51,7 +50,9 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
+        release_name: CodeQL DB for ${{ github.ref }}
+        body: |
+          Attached is the CodeQL database generated for this tag.
         draft: false
         prerelease: false
 
@@ -62,6 +63,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: codeql_db.zip
+        asset_path: ./codeql_db.zip
         asset_name: codeql_db.zip
         asset_content_type: application/zip
