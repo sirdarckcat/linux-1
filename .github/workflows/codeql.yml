@@ -41,13 +41,11 @@ jobs:
             echo "Latest release was created on $(date -d @$LATEST_RELEASE_TS -u)."
           fi
 
-          # Get tags and their unix timestamps (may include timezone, or be missing if lightweight)
-          TAGS_WITH_TIMESTAMPS=$(git for-each-ref refs/tags --sort='-creatordate' --format='%(refname:short) %(creatordate:raw)')
-
           NEW_TAGS=()
-          while read -r tag timestamp tz; do
+          git for-each-ref refs/tags --sort='-creatordate' --format='%(refname:short) %(creatordate:raw)' | (while read -r tag timestamp tz; do
             # Skip lines with missing tag or timestamp
             if [[ -z "$tag" || -z "$timestamp" || ! "$timestamp" =~ ^[0-9]+$ ]]; then
+              echo "skipping $tag"
               continue
             fi
             # Compare timestamps
@@ -58,7 +56,7 @@ jobs:
               # Since tags are sorted by date, stop after old tag
               break
             fi
-          done <<< "$TAGS_WITH_TIMESTAMPS"
+          done)
 
           if [ ${#NEW_TAGS[@]} -eq 0 ]; then
             echo "No new tags found."
