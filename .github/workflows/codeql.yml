@@ -115,7 +115,7 @@ jobs:
           make mrproper
           sudo apt-get update
           sudo apt-get install -y libelf-dev
-          make allyesconfig
+          make allmodconfig
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
