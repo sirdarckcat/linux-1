@@ -115,14 +115,18 @@ jobs:
           make mrproper
           sudo apt-get update
           sudo apt-get install -y libelf-dev
-          make defconfig
+          make allyesconfig
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: c-cpp
-          build-mode: autobuild
+          build-mode: manual
           db-location: /tmp/codeql_db_${{ matrix.tag }}
+
+      - name: Build
+        run: |
+          make
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
