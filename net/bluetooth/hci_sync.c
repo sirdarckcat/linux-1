@@ -6963,7 +6963,7 @@ done:
 	/* Release the get reference taken before queueing */
 	if (hci_conn_valid(hdev, conn))
 		hci_conn_put(conn);
-	
+
 	hci_dev_unlock(hdev);
 }
 
@@ -7057,7 +7057,7 @@ unlock:
 	/* Release the get reference taken before queueing */
 	if (hci_conn_valid(hdev, conn))
 		hci_conn_put(conn);
-	
+
 	hci_dev_unlock(hdev);
 }
 
