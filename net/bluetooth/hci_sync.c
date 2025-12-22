@@ -6960,13 +6960,31 @@ static void create_le_conn_complete(struct hci_dev *hdev, void *data, int err)
 	hci_conn_failed(conn, bt_status(err));
 
 done:
+	/* Release the get reference taken before queueing */
+	if (hci_conn_valid(hdev, conn))
+		hci_conn_put(conn);
+	
 	hci_dev_unlock(hdev);
 }
 
 int hci_connect_le_sync(struct hci_dev *hdev, struct hci_conn *conn)
 {
-	return hci_cmd_sync_queue_once(hdev, hci_le_create_conn_sync, conn,
+	int err;
+
+	/* Take get reference to prevent conn struct from being freed
+	 * before completion callback runs. The hold reference is already
+	 * taken by the caller.
+	 */
+	hci_conn_get(conn);
+
+	err = hci_cmd_sync_queue_once(hdev, hci_le_create_conn_sync, conn,
 				       create_le_conn_complete);
+	if (err) {
+		/* On error/duplicate, clean up the get reference immediately */
+		hci_conn_put(conn);
+	}
+
+	return err;
 }
 
 int hci_cancel_connect_sync(struct hci_dev *hdev, struct hci_conn *conn)
