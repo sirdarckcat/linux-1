@@ -7400,10 +7400,39 @@ static int hci_le_read_remote_features_sync(struct hci_dev *hdev, void *data)
 					HCI_CMD_TIMEOUT, NULL);
 }
 
+/* Helper function to queue commands with hci_conn reference counting.
+ * This centralizes the pattern of taking hold/get references before queueing
+ * and cleaning them up on error, preventing reference leaks on duplicate
+ * submissions or other errors.
+ */
+static int hci_cmd_sync_queue_conn_once(struct hci_dev *hdev,
+					hci_cmd_sync_work_func_t func,
+					struct hci_conn *conn,
+					hci_cmd_sync_work_destroy_t destroy)
+{
+	int err;
+
+	/* Take both hold and get references. hci_conn_hold() prevents
+	 * the connection from being disconnected while the command is
+	 * pending, and hci_conn_get() prevents the conn structure
+	 * from being freed. Both are required per hci_core.h docs.
+	 */
+	hci_conn_hold(conn);
+	hci_conn_get(conn);
+
+	err = hci_cmd_sync_queue_once(hdev, func, conn, destroy);
+	if (err) {
+		/* On error/duplicate, clean up refs immediately */
+		hci_conn_drop(conn);
+		hci_conn_put(conn);
+	}
+
+	return err;
+}
+
 int hci_le_read_remote_features(struct hci_conn *conn)
 {
 	struct hci_dev *hdev = conn->hdev;
-	int err;
 
 	/* The remote features procedure is defined for central
 	 * role only. So only in case of an initiated connection
@@ -7414,27 +7443,11 @@ int hci_le_read_remote_features(struct hci_conn *conn)
 	 * role is possible. Otherwise just transition into the
 	 * connected state without requesting the remote features.
 	 */
-	if (conn->out || (hdev->le_features[0] & HCI_LE_PERIPHERAL_FEATURES)) {
-		/* Take both hold and get references. hci_conn_hold() prevents
-		 * the connection from being disconnected while the command is
-		 * pending, and hci_conn_get() prevents the conn structure
-		 * from being freed. Both are required per hci_core.h docs.
-		 */
-		hci_conn_hold(conn);
-		hci_conn_get(conn);
+	if (conn->out || (hdev->le_features[0] & HCI_LE_PERIPHERAL_FEATURES))
+		return hci_cmd_sync_queue_conn_once(hdev,
+						    hci_le_read_remote_features_sync,
+						    conn,
+						    le_read_features_complete);
 
-		err = hci_cmd_sync_queue_once(hdev,
-					      hci_le_read_remote_features_sync,
-					      conn,
-					      le_read_features_complete);
-		if (err) {
-			/* On error/duplicate, clean up refs immediately */
-			hci_conn_drop(conn);
-			hci_conn_put(conn);
-		}
-	} else {
-		err = -EOPNOTSUPP;
-	}
-
-	return err;
+	return -EOPNOTSUPP;
 }
