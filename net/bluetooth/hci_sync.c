@@ -7332,7 +7332,11 @@ int hci_past_sync(struct hci_conn *conn, struct hci_conn *le)
 	return err;
 }
 
-static void le_read_features_complete(struct hci_dev *hdev, void *data, int err)
+/* Standard completion callback for hci_conn commands queued with
+ * hci_cmd_sync_queue_conn_once(). Handles connection validation and
+ * reference cleanup in a consistent way.
+ */
+static void hci_conn_cmd_complete(struct hci_dev *hdev, void *data, int err)
 {
 	struct hci_conn *conn = data;
 
@@ -7343,11 +7347,20 @@ static void le_read_features_complete(struct hci_dev *hdev, void *data, int err)
 
 	hci_dev_lock(hdev);
 
+	/* Only drop hold if connection is still valid */
 	if (hci_conn_valid(hdev, conn))
 		hci_conn_drop(conn);
 
+	/* Always put get reference */
 	hci_conn_put(conn);
+
 	hci_dev_unlock(hdev);
+}
+
+static void le_read_features_complete(struct hci_dev *hdev, void *data, int err)
+{
+	/* Delegate to standard connection command completion handler */
+	hci_conn_cmd_complete(hdev, data, err);
 }
 
 static int hci_le_read_all_remote_features_sync(struct hci_dev *hdev,
