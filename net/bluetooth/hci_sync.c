@@ -7335,6 +7335,10 @@ int hci_past_sync(struct hci_conn *conn, struct hci_conn *le)
 /* Standard completion callback for hci_conn commands queued with
  * hci_cmd_sync_queue_conn_once(). Handles connection validation and
  * reference cleanup in a consistent way.
+ *
+ * @hdev: HCI device
+ * @data: Connection pointer (struct hci_conn *)
+ * @err: Error status from command execution
  */
 static void hci_conn_cmd_complete(struct hci_dev *hdev, void *data, int err)
 {
@@ -7417,6 +7421,13 @@ static int hci_le_read_remote_features_sync(struct hci_dev *hdev, void *data)
  * This centralizes the pattern of taking hold/get references before queueing
  * and cleaning them up on error, preventing reference leaks on duplicate
  * submissions or other errors.
+ *
+ * @hdev: HCI device
+ * @func: Sync function to execute when command runs
+ * @conn: Connection to manage references for
+ * @destroy: Completion callback for cleanup
+ *
+ * Returns: 0 on success, negative error code on failure
  */
 static int hci_cmd_sync_queue_conn_once(struct hci_dev *hdev,
 					hci_cmd_sync_work_func_t func,
