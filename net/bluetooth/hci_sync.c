@@ -7221,8 +7221,15 @@ static void create_big_complete(struct hci_dev *hdev, void *data, int err)
 	if (err == -ECANCELED)
 		return;
 
-	if (hci_conn_valid(hdev, conn))
+	hci_dev_lock(hdev);
+
+	if (hci_conn_valid(hdev, conn)) {
 		clear_bit(HCI_CONN_CREATE_BIG_SYNC, &conn->flags);
+		/* Release the get reference taken before queueing */
+		hci_conn_put(conn);
+	}
+
+	hci_dev_unlock(hdev);
 }
 
 static int hci_le_big_create_sync(struct hci_dev *hdev, void *data)
@@ -7271,8 +7278,21 @@ static int hci_le_big_create_sync(struct hci_dev *hdev, void *data)
 
 int hci_connect_big_sync(struct hci_dev *hdev, struct hci_conn *conn)
 {
-	return hci_cmd_sync_queue_once(hdev, hci_le_big_create_sync, conn,
+	int err;
+
+	/* Take get reference to prevent conn struct from being freed
+	 * before completion callback runs.
+	 */
+	hci_conn_get(conn);
+
+	err = hci_cmd_sync_queue_once(hdev, hci_le_big_create_sync, conn,
 				       create_big_complete);
+	if (err) {
+		/* On error/duplicate, clean up the get reference immediately */
+		hci_conn_put(conn);
+	}
+
+	return err;
 }
 
 struct past_data {
