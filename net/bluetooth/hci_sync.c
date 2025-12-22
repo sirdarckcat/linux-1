@@ -7415,6 +7415,11 @@ int hci_le_read_remote_features(struct hci_conn *conn)
 	 * connected state without requesting the remote features.
 	 */
 	if (conn->out || (hdev->le_features[0] & HCI_LE_PERIPHERAL_FEATURES)) {
+		/* Take both hold and get references. hci_conn_hold() prevents
+		 * the connection from being disconnected while the command is
+		 * pending, and hci_conn_get() prevents the conn structure
+		 * from being freed. Both are required per hci_core.h docs.
+		 */
 		hci_conn_hold(conn);
 		hci_conn_get(conn);
 
@@ -7423,6 +7428,7 @@ int hci_le_read_remote_features(struct hci_conn *conn)
 					      conn,
 					      le_read_features_complete);
 		if (err) {
+			/* On error/duplicate, clean up refs immediately */
 			hci_conn_drop(conn);
 			hci_conn_put(conn);
 		}
