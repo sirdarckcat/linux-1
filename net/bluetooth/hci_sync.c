@@ -7341,7 +7341,12 @@ static void le_read_features_complete(struct hci_dev *hdev, void *data, int err)
 	if (err == -ECANCELED)
 		return;
 
-	hci_conn_drop(conn);
+	hci_dev_lock(hdev);
+
+	if (hci_conn_valid(hdev, conn))
+		hci_conn_drop(conn);
+
+	hci_dev_unlock(hdev);
 }
 
 static int hci_le_read_all_remote_features_sync(struct hci_dev *hdev,
