@@ -7346,6 +7346,7 @@ static void le_read_features_complete(struct hci_dev *hdev, void *data, int err)
 	if (hci_conn_valid(hdev, conn))
 		hci_conn_drop(conn);
 
+	hci_conn_put(conn);
 	hci_dev_unlock(hdev);
 }
 
@@ -7413,13 +7414,21 @@ int hci_le_read_remote_features(struct hci_conn *conn)
 	 * role is possible. Otherwise just transition into the
 	 * connected state without requesting the remote features.
 	 */
-	if (conn->out || (hdev->le_features[0] & HCI_LE_PERIPHERAL_FEATURES))
+	if (conn->out || (hdev->le_features[0] & HCI_LE_PERIPHERAL_FEATURES)) {
+		hci_conn_hold(conn);
+		hci_conn_get(conn);
+
 		err = hci_cmd_sync_queue_once(hdev,
 					      hci_le_read_remote_features_sync,
-					      hci_conn_hold(conn),
+					      conn,
 					      le_read_features_complete);
-	else
+		if (err) {
+			hci_conn_drop(conn);
+			hci_conn_put(conn);
+		}
+	} else {
 		err = -EOPNOTSUPP;
+	}
 
 	return err;
 }
