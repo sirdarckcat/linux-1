@@ -6990,13 +6990,31 @@ static void create_le_conn_complete(struct hci_dev *hdev, void *data, int err)
 	hci_conn_failed(conn, bt_status(err));
 
 done:
+	/* Release the get reference taken before queueing */
+	if (hci_conn_valid(hdev, conn))
+		hci_conn_put(conn);
+
 	hci_dev_unlock(hdev);
 }
 
 int hci_connect_le_sync(struct hci_dev *hdev, struct hci_conn *conn)
 {
-	return hci_cmd_sync_queue_once(hdev, hci_le_create_conn_sync, conn,
+	int err;
+
+	/* Take get reference to prevent conn struct from being freed
+	 * before completion callback runs. The hold reference is already
+	 * taken by the caller.
+	 */
+	hci_conn_get(conn);
+
+	err = hci_cmd_sync_queue_once(hdev, hci_le_create_conn_sync, conn,
 				       create_le_conn_complete);
+	if (err) {
+		/* On error/duplicate, clean up the get reference immediately */
+		hci_conn_put(conn);
+	}
+
+	return err;
 }
 
 int hci_cancel_connect_sync(struct hci_dev *hdev, struct hci_conn *conn)
@@ -7066,6 +7084,10 @@ static void create_pa_complete(struct hci_dev *hdev, void *data, int err)
 	hci_connect_cfm(pa_sync, bt_status(err));
 
 unlock:
+	/* Release the get reference taken before queueing */
+	if (hci_conn_valid(hdev, conn))
+		hci_conn_put(conn);
+
 	hci_dev_unlock(hdev);
 }
 
@@ -7203,8 +7225,21 @@ done:
 
 int hci_connect_pa_sync(struct hci_dev *hdev, struct hci_conn *conn)
 {
-	return hci_cmd_sync_queue_once(hdev, hci_le_pa_create_sync, conn,
+	int err;
+
+	/* Take get reference to prevent conn struct from being freed
+	 * before completion callback runs.
+	 */
+	hci_conn_get(conn);
+
+	err = hci_cmd_sync_queue_once(hdev, hci_le_pa_create_sync, conn,
 				       create_pa_complete);
+	if (err) {
+		/* On error/duplicate, clean up the get reference immediately */
+		hci_conn_put(conn);
+	}
+
+	return err;
 }
 
 static void create_big_complete(struct hci_dev *hdev, void *data, int err)
@@ -7216,8 +7251,15 @@ static void create_big_complete(struct hci_dev *hdev, void *data, int err)
 	if (err == -ECANCELED)
 		return;
 
-	if (hci_conn_valid(hdev, conn))
+	hci_dev_lock(hdev);
+
+	if (hci_conn_valid(hdev, conn)) {
 		clear_bit(HCI_CONN_CREATE_BIG_SYNC, &conn->flags);
+		/* Release the get reference taken before queueing */
+		hci_conn_put(conn);
+	}
+
+	hci_dev_unlock(hdev);
 }
 
 static int hci_le_big_create_sync(struct hci_dev *hdev, void *data)
@@ -7266,8 +7308,21 @@ static int hci_le_big_create_sync(struct hci_dev *hdev, void *data)
 
 int hci_connect_big_sync(struct hci_dev *hdev, struct hci_conn *conn)
 {
-	return hci_cmd_sync_queue_once(hdev, hci_le_big_create_sync, conn,
+	int err;
+
+	/* Take get reference to prevent conn struct from being freed
+	 * before completion callback runs.
+	 */
+	hci_conn_get(conn);
+
+	err = hci_cmd_sync_queue_once(hdev, hci_le_big_create_sync, conn,
 				       create_big_complete);
+	if (err) {
+		/* On error/duplicate, clean up the get reference immediately */
+		hci_conn_put(conn);
+	}
+
+	return err;
 }
 
 struct past_data {
@@ -7362,7 +7417,15 @@ int hci_past_sync(struct hci_conn *conn, struct hci_conn *le)
 	return err;
 }
 
-static void le_read_features_complete(struct hci_dev *hdev, void *data, int err)
+/* Standard completion callback for hci_conn commands queued with
+ * hci_cmd_sync_queue_conn_once(). Handles connection validation and
+ * reference cleanup in a consistent way.
+ *
+ * @hdev: HCI device
+ * @data: Connection pointer (struct hci_conn *)
+ * @err: Error status from command execution
+ */
+static void hci_conn_cmd_complete(struct hci_dev *hdev, void *data, int err)
 {
 	struct hci_conn *conn = data;
 
@@ -7371,7 +7434,22 @@ static void le_read_features_complete(struct hci_dev *hdev, void *data, int err)
 	if (err == -ECANCELED)
 		return;
 
-	hci_conn_drop(conn);
+	hci_dev_lock(hdev);
+
+	/* Only drop hold if connection is still valid */
+	if (hci_conn_valid(hdev, conn))
+		hci_conn_drop(conn);
+
+	/* Always put get reference */
+	hci_conn_put(conn);
+
+	hci_dev_unlock(hdev);
+}
+
+static void le_read_features_complete(struct hci_dev *hdev, void *data, int err)
+{
+	/* Delegate to standard connection command completion handler */
+	hci_conn_cmd_complete(hdev, data, err);
 }
 
 static int hci_le_read_all_remote_features_sync(struct hci_dev *hdev,
@@ -7424,10 +7502,46 @@ static int hci_le_read_remote_features_sync(struct hci_dev *hdev, void *data)
 					HCI_CMD_TIMEOUT, NULL);
 }
 
+/* Helper function to queue commands with hci_conn reference counting.
+ * This centralizes the pattern of taking hold/get references before queueing
+ * and cleaning them up on error, preventing reference leaks on duplicate
+ * submissions or other errors.
+ *
+ * @hdev: HCI device
+ * @func: Sync function to execute when command runs
+ * @conn: Connection to manage references for
+ * @destroy: Completion callback for cleanup
+ *
+ * Returns: 0 on success, negative error code on failure
+ */
+static int hci_cmd_sync_queue_conn_once(struct hci_dev *hdev,
+					hci_cmd_sync_work_func_t func,
+					struct hci_conn *conn,
+					hci_cmd_sync_work_destroy_t destroy)
+{
+	int err;
+
+	/* Take both hold and get references. hci_conn_hold() prevents
+	 * the connection from being disconnected while the command is
+	 * pending, and hci_conn_get() prevents the conn structure
+	 * from being freed. Both are required per hci_core.h docs.
+	 */
+	hci_conn_hold(conn);
+	hci_conn_get(conn);
+
+	err = hci_cmd_sync_queue_once(hdev, func, conn, destroy);
+	if (err) {
+		/* On error/duplicate, clean up refs immediately */
+		hci_conn_drop(conn);
+		hci_conn_put(conn);
+	}
+
+	return err;
+}
+
 int hci_le_read_remote_features(struct hci_conn *conn)
 {
 	struct hci_dev *hdev = conn->hdev;
-	int err;
 
 	/* The remote features procedure is defined for central
 	 * role only. So only in case of an initiated connection
@@ -7439,14 +7553,12 @@ int hci_le_read_remote_features(struct hci_conn *conn)
 	 * connected state without requesting the remote features.
 	 */
 	if (conn->out || (hdev->le_features[0] & HCI_LE_PERIPHERAL_FEATURES))
-		err = hci_cmd_sync_queue_once(hdev,
-					      hci_le_read_remote_features_sync,
-					      hci_conn_hold(conn),
-					      le_read_features_complete);
-	else
-		err = -EOPNOTSUPP;
+		return hci_cmd_sync_queue_conn_once(hdev,
+						    hci_le_read_remote_features_sync,
+						    conn,
+						    le_read_features_complete);
 
-	return err;
+	return -EOPNOTSUPP;
 }
 
 static void pkt_type_changed(struct hci_dev *hdev, void *data, int err)
